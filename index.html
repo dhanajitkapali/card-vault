@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#0b0b0f">
+<meta name="robots" content="noindex, nofollow">
+<title>Cards</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cards">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ SETUP: first run ============ -->
+<section id="setupScreen" class="screen gate" hidden>
+  <div class="gate__inner">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <h1 class="brand__name">Cards</h1>
+    </div>
+    <p class="gate__lede">Choose a passphrase. It encrypts everything on this device.</p>
+
+    <form id="setupForm" class="gate__form" autocomplete="off">
+      <input id="setupPass" class="field" type="password" placeholder="Passphrase"
+             autocomplete="new-password" minlength="8" required aria-label="Passphrase">
+      <input id="setupPass2" class="field" type="password" placeholder="Repeat passphrase"
+             autocomplete="new-password" minlength="8" required aria-label="Repeat passphrase">
+      <p id="setupError" class="msg msg--error" role="alert" hidden></p>
+      <button id="setupBtn" class="btn btn--primary" type="submit">Create vault</button>
+    </form>
+
+    <p class="gate__warn">
+      There is no recovery. Forget the passphrase and the cards are unreadable —
+      by design.
+    </p>
+  </div>
+</section>
+
+<!-- ============ LOCK ============ -->
+<section id="lockScreen" class="screen gate" hidden>
+  <div class="gate__inner">
+    <div class="brand">
+      <span class="brand__mark brand__mark--locked" aria-hidden="true"></span>
+      <h1 class="brand__name">Cards</h1>
+    </div>
+    <p class="gate__lede">Locked</p>
+
+    <form id="lockForm" class="gate__form" autocomplete="off">
+      <input id="lockPass" class="field" type="password" placeholder="Passphrase"
+             autocomplete="current-password" required aria-label="Passphrase">
+      <p id="lockError" class="msg msg--error" role="alert" hidden></p>
+      <button id="lockBtn" class="btn btn--primary" type="submit">Unlock</button>
+    </form>
+
+    <button id="faceIdBtn" class="btn btn--ghost btn--face" type="button" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/>
+        <path d="M9 10v1M15 10v1M12 10v3l-1 1"/><path d="M9 15.5s1.2 1 3 1 3-1 3-1"/>
+      </svg>
+      Unlock with Face ID
+    </button>
+  </div>
+</section>
+
+<!-- ============ VAULT ============ -->
+<section id="vaultScreen" class="screen" hidden>
+  <header class="topbar">
+    <div>
+      <h1 class="topbar__title">Cards</h1>
+      <p id="countLine" class="topbar__sub"></p>
+    </div>
+    <div class="topbar__actions">
+      <button id="lockNowBtn" class="icon-btn" type="button" aria-label="Lock now">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+        </svg>
+      </button>
+      <button id="addBtn" class="icon-btn icon-btn--accent" type="button" aria-label="Add a card">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <ul id="cardList" class="cards"></ul>
+
+  <p id="emptyState" class="empty" hidden>
+    No cards yet.<br><span>Tap <strong>+</strong> to add your first one.</span>
+  </p>
+
+  <footer class="foot">
+    <button id="faceIdEnrolBtn" class="linkbtn" type="button" hidden></button>
+    <p class="foot__note">Encrypted on this device only. Locks when you switch away.</p>
+  </footer>
+</section>
+
+<!-- ============ ADD / EDIT SHEET ============ -->
+<div id="sheetScrim" class="scrim" hidden></div>
+<section id="editSheet" class="sheet" aria-label="Card details" hidden>
+  <div class="sheet__grip" aria-hidden="true"></div>
+  <h2 id="sheetTitle" class="sheet__title">Add a card</h2>
+
+  <form id="cardForm" autocomplete="off">
+    <label class="lbl" for="fLabel">Name</label>
+    <input id="fLabel" class="field" type="text" placeholder="e.g. HDFC Regalia" maxlength="40" required>
+
+    <label class="lbl" for="fNumber">Card number</label>
+    <input id="fNumber" class="field" type="text" inputmode="numeric" placeholder="0000 0000 0000 0000"
+           autocomplete="off" required>
+
+    <div class="row">
+      <div>
+        <label class="lbl" for="fExpiry">Expiry</label>
+        <input id="fExpiry" class="field" type="text" inputmode="numeric" placeholder="MM/YY" maxlength="5">
+      </div>
+      <div>
+        <label class="lbl" for="fCvv">CVV</label>
+        <input id="fCvv" class="field" type="text" inputmode="numeric" placeholder="123" maxlength="4">
+      </div>
+    </div>
+
+    <label class="lbl" for="fHolder">Cardholder <span class="opt">optional</span></label>
+    <input id="fHolder" class="field" type="text" maxlength="40">
+
+    <label class="lbl" for="fNote">Note <span class="opt">optional</span></label>
+    <input id="fNote" class="field" type="text" maxlength="80">
+
+    <p id="formError" class="msg msg--error" role="alert" hidden></p>
+
+    <div class="sheet__actions">
+      <button id="cancelBtn" class="btn btn--ghost" type="button">Cancel</button>
+      <button id="saveBtn" class="btn btn--primary" type="submit">Save</button>
+    </div>
+  </form>
+</section>
+
+<!-- ============ CONFIRM ============ -->
+<section id="confirmSheet" class="sheet sheet--small" role="alertdialog" aria-labelledby="confirmTitle" hidden>
+  <h2 id="confirmTitle" class="sheet__title"></h2>
+  <p id="confirmBody" class="sheet__body"></p>
+  <div class="sheet__actions">
+    <button id="confirmNo" class="btn btn--ghost" type="button">Cancel</button>
+    <button id="confirmYes" class="btn btn--danger" type="button">Delete</button>
+  </div>
+</section>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

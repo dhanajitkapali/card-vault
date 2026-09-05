@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cards — tests</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body{padding:1.5rem;font-family:var(--mono)}
+  h1{font-family:var(--font);font-size:1.3rem;margin-bottom:.3rem}
+  #summary{font-family:var(--font);margin:.6rem 0 1.2rem;font-weight:700}
+  ol{list-style:none;display:flex;flex-direction:column;gap:.3rem}
+  li{font-size:.82rem;padding:.5rem .7rem;border-radius:10px;background:var(--surface);border:1px solid var(--border)}
+  .ok{color:var(--green)} .bad{color:var(--red);border-color:var(--red)}
+</style>
+</head>
+<body>
+<h1>Cards — validation tests</h1>
+<p id="summary">running…</p>
+<ol id="out"></ol>
+
+<script type="module">
+import { luhn, plausible, brandOf, groupNumber, maskNumber, validExpiry, digitsOf } from './js/crypto.js';
+
+const results = [];
+const t = (name, actual, expected) => results.push({
+  name, ok: JSON.stringify(actual) === JSON.stringify(expected), actual, expected
+});
+
+// --- PLAN.md §4: the case that makes gate 2 necessary ---------------------
+// 424242424242424 is 4242424242424242 with a digit dropped by OCR.
+// It PASSES Luhn. Only the length/prefix rule catches it.
+t('OCR-mangled 424242424242424 passes Luhn (this is why gate 2 exists)',
+  luhn('424242424242424'), true);
+t('OCR-mangled 424242424242424 fails plausible()',
+  plausible('424242424242424'), false);
+t('=> scanner would REJECT the mangled number',
+  luhn('424242424242424') && plausible('424242424242424'), false);
+
+// --- accepted, real pairs -------------------------------------------------
+t('Visa 16 accepted',        luhn('4242424242424242') && plausible('4242424242424242'), true);
+t('Amex 15 accepted',        luhn('378282246310005') && plausible('378282246310005'), true);
+t('Diners 14 accepted',      luhn('36227206271667')  && plausible('36227206271667'),  true);
+t('Mastercard 16 accepted',  luhn('5555555555554444') && plausible('5555555555554444'), true);
+t('Mastercard 2-series 16',  luhn('2223003122003222') && plausible('2223003122003222'), true);
+t('Discover 16 accepted',    luhn('6011111111111117') && plausible('6011111111111117'), true);
+
+// --- plausible() length/prefix table --------------------------------------
+t('15 digits must start 34/37', plausible('371449635398431'), true);
+t('15 digits starting 42 rejected', plausible('424242424242424'), false);
+t('14 digits must be Diners',   plausible('30569309025904'), true);
+t('13 digits must start 4',     plausible('4222222222222'), true);
+t('13 digits starting 5 rejected', plausible('5222222222222'), false);
+t('17 digits never plausible',  plausible('42424242424242424'), false);
+t('19 digits starting 6 ok',    plausible('6212345678901234567'), true);
+
+// --- Luhn rejects bad checksums ------------------------------------------
+t('bad checksum rejected',      luhn('4242424242424243'), false);
+t('too short rejected',         luhn('4242'), false);
+t('empty rejected',             luhn(''), false);
+
+// --- formatting -----------------------------------------------------------
+t('digitsOf strips spaces',     digitsOf('4242 4242 4242 4242'), '4242424242424242');
+t('group 16 as 4-4-4-4',        groupNumber('4242424242424242'), '4242 4242 4242 4242');
+t('group Amex as 4-6-5',        groupNumber('378282246310005'), '3782 822463 10005');
+t('mask shows last 4 only',     maskNumber('4242424242424242'), '•••• •••• •••• 4242');
+t('copy value is digits only',  digitsOf(groupNumber('4242424242424242')), '4242424242424242');
+
+// --- brand ----------------------------------------------------------------
+t('brand Visa',       brandOf('4242424242424242'), 'VISA');
+t('brand Amex',       brandOf('378282246310005'),  'AMEX');
+t('brand Mastercard', brandOf('5555555555554444'), 'MASTERCARD');
+
+// --- expiry ---------------------------------------------------------------
+const yy = String((new Date().getFullYear() + 2) % 100).padStart(2, '0');
+t('valid future expiry', validExpiry(`12/${yy}`), true);
+t('month 13 rejected',   validExpiry(`13/${yy}`), false);
+t('month 00 rejected',   validExpiry(`00/${yy}`), false);
+t('past year rejected',  validExpiry('12/20'), false);
+t('garbage rejected',    validExpiry('hello'), false);
+
+const passed = results.filter(r => r.ok).length;
+const failed = results.length - passed;
+document.getElementById('summary').textContent =
+  failed === 0 ? `ALL ${passed} TESTS PASSED` : `${failed} FAILED / ${results.length}`;
+document.getElementById('summary').className = failed === 0 ? 'ok' : 'bad';
+document.getElementById('out').innerHTML = results.map(r =>
+  `<li class="${r.ok ? 'ok' : 'bad'}">${r.ok ? 'PASS' : 'FAIL'} — ${r.name}` +
+  (r.ok ? '' : ` (got ${JSON.stringify(r.actual)}, wanted ${JSON.stringify(r.expected)})`) + '</li>'
+).join('');
+window.__testSummary = { passed, failed, results };
+</script>
+</body>
+</html>
