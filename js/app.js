@@ -2,12 +2,11 @@
 // Never console.log a decrypted card (PLAN.md §6).
 
 import {
-  deriveKeyBytes, importAesKey, encryptJSON, decryptJSON, randomBytes,
+  randomKeyBytes, importAesKey, encryptJSON, decryptJSON,
   luhn, digitsOf, brandOf, groupNumber, maskNumber, validExpiry,
 } from './crypto.js';
 import {
-  metaGet, metaSet, metaDel, cardsAll, cardPut, cardDel,
-  isInitialised, requestPersistence,
+  metaGet, metaSet, metaDel, cardsAll, cardPut, cardDel, requestPersistence,
 } from './db.js';
 import * as faceid from './faceid.js';
 
@@ -23,12 +22,11 @@ let idleTimer = null;
 const $ = (id) => document.getElementById(id);
 const el = {
   setup: $('setupScreen'), lock: $('lockScreen'), vault: $('vaultScreen'),
-  setupForm: $('setupForm'), setupPass: $('setupPass'), setupPass2: $('setupPass2'),
-  setupError: $('setupError'), setupBtn: $('setupBtn'),
-  lockForm: $('lockForm'), lockPass: $('lockPass'), lockError: $('lockError'),
-  lockBtn: $('lockBtn'), faceIdBtn: $('faceIdBtn'),
+  setupBtn: $('setupBtn'), setupError: $('setupError'),
+  faceIdBtn: $('faceIdBtn'), lockError: $('lockError'),
+  resetVaultBtn: $('resetVaultBtn'),
   list: $('cardList'), empty: $('emptyState'), count: $('countLine'),
-  addBtn: $('addBtn'), lockNowBtn: $('lockNowBtn'), faceIdEnrol: $('faceIdEnrolBtn'),
+  addBtn: $('addBtn'), lockNowBtn: $('lockNowBtn'),
   scrim: $('sheetScrim'), sheet: $('editSheet'), sheetTitle: $('sheetTitle'),
   form: $('cardForm'), fLabel: $('fLabel'), fNumber: $('fNumber'), fExpiry: $('fExpiry'),
   fCvv: $('fCvv'), fHolder: $('fHolder'), fNote: $('fNote'), formError: $('formError'),
@@ -72,10 +70,8 @@ function lock() {
   editingId = null;
   closeSheet();
   clearTimeout(idleTimer);
-  el.lockPass.value = '';
   clearError(el.lockError);
   show('lock');
-  refreshFaceIdButton();
 }
 
 function touchIdle() {
@@ -91,117 +87,74 @@ document.addEventListener('visibilitychange', () => {
 ['pointerdown', 'keydown'].forEach((e) => document.addEventListener(e, touchIdle, { passive: true }));
 
 /* ---------------- unlock paths ---------------- */
+// The vault key never leaves memory in unwrapped form; Face ID is the only
+// thing that can produce it (PLAN.md §9).
 async function openVaultWith(rawBytes) {
   const key = await importAesKey(rawBytes);
-  const check = await metaGet('check');
-  await decryptJSON(key, check);        // throws => wrong key
   vaultKeyRaw = rawBytes;
   vaultKey = key;
   await loadCards();
   show('vault');
   touchIdle();
   requestPersistence();
-  refreshEnrolButton();
 }
 
-el.setupForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
+// Setup proves Face ID works BEFORE any vault exists, so an unsupported
+// device can never end up holding cards it cannot open.
+el.setupBtn.addEventListener('click', async () => {
   clearError(el.setupError);
-  const p1 = el.setupPass.value, p2 = el.setupPass2.value;
-  if (p1.length < 8) return showError(el.setupError, 'Use at least 8 characters.');
-  if (p1 !== p2) return showError(el.setupError, 'The two passphrases do not match.');
-
   el.setupBtn.disabled = true;
-  el.setupBtn.textContent = 'Encrypting…';
   try {
-    const salt = randomBytes(16);
-    const raw = await deriveKeyBytes(p1, salt);
-    const key = await importAesKey(raw);
-    await metaSet('salt', salt);
-    await metaSet('check', await encryptJSON(key, { v: 'ok' }));
-    el.setupPass.value = el.setupPass2.value = '';
+    if (!(await faceid.maybeAvailable())) throw new Error('unsupported');
+    const raw = randomKeyBytes();
+    const enrolled = await faceid.enrol(raw);   // throws if PRF is missing
+    await metaSet('faceid', enrolled);
     await openVaultWith(raw);
-  } catch {
-    showError(el.setupError, 'Could not create the vault.');
+  } catch (err) {
+    if (err && err.name === 'NotAllowedError') { /* cancelled — say nothing */ }
+    else if (err && err.message === 'unsupported') {
+      showError(el.setupError,
+        'This device cannot do Face ID unlock (it needs iOS 18 or later). ' +
+        'Nothing was saved.');
+    } else {
+      showError(el.setupError, 'Could not set up Face ID. Nothing was saved.');
+    }
   } finally {
     el.setupBtn.disabled = false;
-    el.setupBtn.textContent = 'Create vault';
   }
 });
-
-el.lockForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  clearError(el.lockError);
-  el.lockBtn.disabled = true;
-  el.lockBtn.textContent = 'Unlocking…';
-  try {
-    const salt = await metaGet('salt');
-    const raw = await deriveKeyBytes(el.lockPass.value, salt);
-    await openVaultWith(raw);
-    el.lockPass.value = '';
-  } catch {
-    showError(el.lockError, 'Wrong passphrase.');
-  } finally {
-    el.lockBtn.disabled = false;
-    el.lockBtn.textContent = 'Unlock';
-  }
-});
-
-el.lockNowBtn.addEventListener('click', lock);
-
-/* ---------------- Face ID ---------------- */
-async function refreshFaceIdButton() {
-  const rec = await metaGet('faceid');
-  el.faceIdBtn.hidden = !rec;
-}
-
-async function refreshEnrolButton() {
-  const rec = await metaGet('faceid');
-  const can = await faceid.maybeAvailable();
-  if (!can && !rec) { el.faceIdEnrol.hidden = true; return; }
-  el.faceIdEnrol.hidden = false;
-  el.faceIdEnrol.textContent = rec ? 'Turn off Face ID unlock' : 'Enable Face ID unlock';
-}
 
 el.faceIdBtn.addEventListener('click', async () => {
   clearError(el.lockError);
+  el.faceIdBtn.disabled = true;
   try {
     const rec = await metaGet('faceid');
-    if (!rec) return;
-    const raw = await faceid.unwrap(rec);
-    await openVaultWith(raw);
+    if (!rec) return show('setup');
+    await openVaultWith(await faceid.unwrap(rec));
   } catch (err) {
-    if (err && err.name === 'NotAllowedError') return;      // user cancelled
-    showError(el.lockError, 'Face ID unlock failed. Use your passphrase.');
+    if (err && err.name === 'NotAllowedError') { /* cancelled */ }
+    else showError(el.lockError, 'Face ID did not unlock the vault.');
+  } finally {
+    el.faceIdBtn.disabled = false;
   }
 });
 
-el.faceIdEnrol.addEventListener('click', async () => {
-  const rec = await metaGet('faceid');
-  if (rec) {
-    await metaDel('faceid');
-    await refreshEnrolButton();
-    toast('Face ID unlock turned off');
-    return;
-  }
-  if (!vaultKeyRaw) return;
-  try {
-    el.faceIdEnrol.disabled = true;
-    const enrolled = await faceid.enrol(vaultKeyRaw);
-    await metaSet('faceid', enrolled);
-    await refreshEnrolButton();
-    toast('Face ID unlock enabled');
-  } catch (err) {
-    if (err && err.name === 'NotAllowedError') { /* cancelled */ }
-    else if (err && err.message === 'unsupported') {
-      toast('This device does not support Face ID unlock');
-    } else {
-      toast('Could not enable Face ID unlock');
-    }
-  } finally {
-    el.faceIdEnrol.disabled = false;
-  }
+// Without a passphrase there is no other way back in, so the only honest
+// escape from a lost passkey is to wipe and start again.
+el.resetVaultBtn.addEventListener('click', async () => {
+  const ok = await confirmAsk('Start over?',
+    'Every saved card is erased and a new Face ID key is created. This cannot be undone.',
+    'Erase everything');
+  if (!ok) return;
+  for (const c of await cardsAll()) await cardDel(c.id);
+  await metaDel('faceid');
+  cards = [];
+  el.list.innerHTML = '';
+  clearError(el.lockError);
+  show('setup');
 });
+
+el.lockNowBtn.addEventListener('click', lock);
 
 /* ---------------- cards ---------------- */
 async function loadCards() {
@@ -326,7 +279,11 @@ function openSheet(card) {
 // stale `.is-open` left on a hidden sheet makes it snap open with no
 // slide-up next time. Always clear it, and force a reflow after un-hiding
 // so the transition has a starting frame to animate from.
+let hideTimer = null;
+
 function reveal(sheet) {
+  clearTimeout(hideTimer);          // a pending hide must not clobber this open
+  hideTimer = null;
   el.scrim.hidden = false;
   sheet.hidden = false;
   el.scrim.classList.remove('is-open');
@@ -340,11 +297,13 @@ function closeSheet() {
   el.sheet.classList.remove('is-open');
   el.confirm.classList.remove('is-open');
   el.scrim.classList.remove('is-open');
-  setTimeout(() => {
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
     for (const node of [el.sheet, el.confirm, el.scrim]) {
       node.hidden = true;
       node.classList.remove('is-open');
     }
+    hideTimer = null;
   }, 320);
 }
 
@@ -421,13 +380,15 @@ function confirmClose(answer) {
   const sheetStillOpen = el.sheet.classList.contains('is-open');
   el.confirm.classList.remove('is-open');
   if (!sheetStillOpen) el.scrim.classList.remove('is-open');
-  setTimeout(() => {
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
     el.confirm.hidden = true;
     el.confirm.classList.remove('is-open');
     if (!sheetStillOpen) {
       el.scrim.hidden = true;
       el.scrim.classList.remove('is-open');
     }
+    hideTimer = null;
   }, 320);
   if (confirmResolve) { confirmResolve(answer); confirmResolve = null; }
 }
@@ -442,8 +403,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------------- boot ---------------- */
 (async function boot() {
-  show(await isInitialised() ? 'lock' : 'setup');
-  await refreshFaceIdButton();
+  show(await metaGet('faceid') ? 'lock' : 'setup');
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }

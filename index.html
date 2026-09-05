@@ -28,20 +28,21 @@
       <span class="brand__mark" aria-hidden="true"></span>
       <h1 class="brand__name">Cards</h1>
     </div>
-    <p class="gate__lede">Choose a passphrase. It encrypts everything on this device.</p>
+    <p class="gate__lede">Your cards, encrypted on this device and opened with Face ID.</p>
 
-    <form id="setupForm" class="gate__form" autocomplete="off">
-      <input id="setupPass" class="field" type="password" placeholder="Passphrase"
-             autocomplete="new-password" minlength="8" required aria-label="Passphrase">
-      <input id="setupPass2" class="field" type="password" placeholder="Repeat passphrase"
-             autocomplete="new-password" minlength="8" required aria-label="Repeat passphrase">
-      <p id="setupError" class="msg msg--error" role="alert" hidden></p>
-      <button id="setupBtn" class="btn btn--primary" type="submit">Create vault</button>
-    </form>
+    <button id="setupBtn" class="btn btn--primary btn--face" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/>
+        <path d="M9 10v1M15 10v1M12 10v3l-1 1"/><path d="M9 15.5s1.2 1 3 1 3-1 3-1"/>
+      </svg>
+      Set up with Face ID
+    </button>
+    <p id="setupError" class="msg msg--error" role="alert" hidden></p>
 
     <p class="gate__warn">
-      There is no recovery. Forget the passphrase and the cards are unreadable —
-      by design.
+      There is no passphrase and no recovery. If this device&rsquo;s Face ID key is
+      ever lost, the saved cards cannot be read again &mdash; you would add them
+      back from the cards themselves.
     </p>
   </div>
 </section>
@@ -55,19 +56,17 @@
     </div>
     <p class="gate__lede">Locked</p>
 
-    <form id="lockForm" class="gate__form" autocomplete="off">
-      <input id="lockPass" class="field" type="password" placeholder="Passphrase"
-             autocomplete="current-password" required aria-label="Passphrase">
-      <p id="lockError" class="msg msg--error" role="alert" hidden></p>
-      <button id="lockBtn" class="btn btn--primary" type="submit">Unlock</button>
-    </form>
-
-    <button id="faceIdBtn" class="btn btn--ghost btn--face" type="button" hidden>
+    <button id="faceIdBtn" class="btn btn--primary btn--face" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/>
         <path d="M9 10v1M15 10v1M12 10v3l-1 1"/><path d="M9 15.5s1.2 1 3 1 3-1 3-1"/>
       </svg>
       Unlock with Face ID
+    </button>
+    <p id="lockError" class="msg msg--error" role="alert" hidden></p>
+
+    <button id="resetVaultBtn" class="linkbtn linkbtn--quiet" type="button">
+      Face ID no longer works &mdash; start over
     </button>
   </div>
 </section>
@@ -98,8 +97,7 @@
   </p>
 
   <footer class="foot">
-    <button id="faceIdEnrolBtn" class="linkbtn" type="button" hidden></button>
-    <p class="foot__note">Encrypted on this device only. Locks when you switch away.</p>
+    <p class="foot__note">Encrypted on this device. Locks when you switch away.</p>
   </footer>
 </section>
 

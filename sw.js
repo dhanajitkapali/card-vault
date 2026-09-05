@@ -1,6 +1,6 @@
 // Offline shell. Cache-first: the app must open with no network at all.
 // Bump CACHE on every release or clients keep the old shell.
-const CACHE = 'cards-v1';
+const CACHE = 'cards-v2';
 const SHELL = [
   './', './index.html', './styles.css',
   './js/app.js', './js/crypto.js', './js/db.js', './js/faceid.js',

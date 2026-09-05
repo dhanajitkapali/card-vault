@@ -87,7 +87,7 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .btn--primary{background:var(--accent);color:#0d1020}
 .btn--ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
 .btn--danger{background:var(--red);color:#1a0c0c}
-.btn--face{margin-top:.8rem;width:100%}
+.btn--face{margin-top:.4rem;width:100%}
 .btn--face svg{width:18px;height:18px}
 
 .icon-btn{
@@ -104,6 +104,8 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
   background:none;border:0;color:var(--accent);font-family:inherit;font-size:.85rem;
   font-weight:600;cursor:pointer;padding:.4rem;
 }
+.linkbtn--quiet{color:var(--faint);font-weight:500;margin-top:1.6rem}
+.linkbtn--quiet:hover{color:var(--muted)}
 
 .msg{font-size:.82rem;text-align:left;padding:0 .2rem}
 .msg--error{color:var(--red)}

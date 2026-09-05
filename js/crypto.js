@@ -1,25 +1,15 @@
 // Crypto + card-number validation. No network, no dependencies.
-// PLAN.md §4 is LOCKED: do not lower the iteration count, do not add recovery.
-
-export const PBKDF2_ITERATIONS = 310000;
+// PLAN.md §4 is LOCKED for the card-number rules; §9 records the owner
+// override that replaced the passphrase with Face ID.
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 export const randomBytes = (n) => crypto.getRandomValues(new Uint8Array(n));
 
-// Passphrase -> 32 raw key bytes. Raw bytes (not just a CryptoKey) because
-// Face ID enrolment has to wrap them; both live in the same nulled-on-lock slot.
-export async function deriveKeyBytes(passphrase, salt) {
-  const base = await crypto.subtle.importKey(
-    'raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveBits']
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    base, 256
-  );
-  return new Uint8Array(bits);
-}
+// The vault key is random, not derived: Face ID (WebAuthn PRF) is the only
+// thing that can unwrap it. See PLAN.md §9.
+export const randomKeyBytes = () => randomBytes(32);
 
 export function importAesKey(rawBytes) {
   return crypto.subtle.importKey(

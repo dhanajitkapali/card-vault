@@ -40,10 +40,6 @@ export const cardsAll = () => tx('cards', 'readonly', (s) => s.getAll());
 export const cardPut = (rec) => tx('cards', 'readwrite', (s) => s.put(rec));
 export const cardDel = (id) => tx('cards', 'readwrite', (s) => s.delete(id));
 
-export async function isInitialised() {
-  return Boolean(await metaGet('salt'));
-}
-
 // Best-effort hint to the OS not to evict us under storage pressure.
 // Home-screen install is what actually matters on iOS; this costs nothing.
 export async function requestPersistence() {

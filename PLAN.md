@@ -230,3 +230,31 @@ than an ad-hoc script.
   the origin.
 - `getUserMedia` needs HTTPS. Pages provides it. For local dev use
   `localhost`, which is treated as secure.
+
+---
+
+## 9. Owner override — Face ID only (supersedes C3/C4 and §P2)
+
+Decided by the owner after the v1 build. **The passphrase is removed.**
+
+- The vault key is **random** (`crypto.getRandomValues`, 32 bytes), not derived
+  from a passphrase. PBKDF2 is gone.
+- It is stored only **wrapped** under the WebAuthn `prf` secret, which the
+  authenticator emits solely after a successful biometric check
+  (`userVerification: 'required'`). Nothing in `meta` or `cards` is readable
+  without Face ID.
+- `salt` and the `check` blob no longer exist. The `faceid` record is what
+  marks an initialised vault; AES-GCM authentication on the wrapped key is
+  the correctness check.
+
+**Consequences, accepted:**
+
+- Face ID is the *only* way in. A lost passkey means the cards are
+  unreadable — the lock screen offers "start over", which erases them.
+- Security is now equivalent to the device: anyone who can pass Face ID on
+  this phone can read the cards. There is no second factor.
+
+**Safety rule that must not be removed:** setup performs a real PRF enrolment
+*before* creating the vault. If PRF is unavailable the vault is never created,
+so a device can never end up holding cards it cannot open. Do not "optimise"
+this into a capability check alone.
